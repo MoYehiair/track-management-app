@@ -6,7 +6,7 @@ The UI works immediately with representative demo data when Supabase environment
 
 ## What is included
 
-- Track list with artist, genre, release date, status, and status filtering
+- Server-paginated track list with artist, genre, release date, status, and status filtering
 - Track detail with full metadata and per-DSP distribution state
 - Authenticated create-artist and create-track forms
 - Passwordless Supabase Auth sign-in
@@ -132,7 +132,7 @@ Seed tracks are read-only examples because they have no owner. Sign in and use *
 `src/lib/tracks.ts` exports:
 
 - `createArtist`, `listArtists`
-- `createTrack`, `listTracks` with `artistId`, `genre`, and `status` filters
+- `createTrack`, `listTracks`, and `listTracksPage` with `artistId`, `genre`, and `status` filters
 - `getTrack` with joined artist and DSP distribution data
 - `updateTrackStatus`
 - `distributeTrack` through the Edge Function

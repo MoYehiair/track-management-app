@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { createArtist, createTrack, distributeTrack, getTrack, listArtists, listDsps, listTracks, updateTrackStatus } from './lib/tracks'
+import { createArtist, createTrack, distributeTrack, getTrack, listArtists, listDsps, listTracksPage, updateTrackStatus } from './lib/tracks'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Artist, Dsp, Track, TrackStatus } from './types'
 
@@ -10,6 +10,8 @@ const filters: Array<{ label: string; value: TrackStatus | 'all' }> = [
   { label: 'Submitted', value: 'submitted' },
   { label: 'Distributed', value: 'distributed' },
 ]
+
+const PAGE_SIZE = 8
 
 const formatDate = (date: string) =>
   new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
@@ -21,6 +23,8 @@ function StatusPill({ status }: { status: string }) {
 function App() {
   const [status, setStatus] = useState<TrackStatus | 'all'>('all')
   const [tracks, setTracks] = useState<Track[]>([])
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [selected, setSelected] = useState<Track | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,12 +44,18 @@ function App() {
     let active = true
     setLoading(true)
     setError('')
-    listTracks(status)
-      .then((data) => active && setTracks(data))
+    listTracksPage(status, page, PAGE_SIZE)
+      .then((result) => {
+        if (!active) return
+        setTracks(result.tracks)
+        setTotalCount(result.count)
+        const lastPage = Math.max(1, Math.ceil(result.count / PAGE_SIZE))
+        if (page > lastPage) setPage(lastPage)
+      })
       .catch((reason: Error) => active && setError(reason.message))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [status, reloadKey])
+  }, [status, page, reloadKey])
 
   async function openTrack(id: string) {
     setError('')
@@ -57,10 +67,9 @@ function App() {
     }
   }
 
-  const counts = useMemo(() => ({
-    total: tracks.length,
-    ready: tracks.filter((track) => track.status === 'distributed').length,
-  }), [tracks])
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const firstResult = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const lastResult = Math.min(page * PAGE_SIZE, totalCount)
 
   return (
     <div className="app-shell">
@@ -92,8 +101,8 @@ function App() {
                 <p className="lede">Review releases and follow every handoff from draft to DSP.</p>
               </div>
               <div className="summary" aria-label="Current results summary">
-                <span><strong>{String(counts.total).padStart(2, '0')}</strong> shown</span>
-                <span><strong>{String(counts.ready).padStart(2, '0')}</strong> live</span>
+                <span><strong>{String(totalCount).padStart(2, '0')}</strong> matches</span>
+                <span><strong>{page}/{totalPages}</strong> page</span>
               </div>
             </div>
 
@@ -103,7 +112,7 @@ function App() {
                   className={status === filter.value ? 'filter filter--active' : 'filter'}
                   type="button"
                   key={filter.value}
-                  onClick={() => setStatus(filter.value)}
+                  onClick={() => { setStatus(filter.value); setPage(1) }}
                 >
                   {filter.label}
                 </button>
@@ -119,23 +128,33 @@ function App() {
             ) : tracks.length === 0 ? (
               <div className="empty-state"><h2>No tracks here</h2><p>Try a different status filter.</p></div>
             ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>Track</th><th>Artist</th><th>Genre</th><th>Release</th><th>Status</th><th><span className="sr-only">Open</span></th></tr></thead>
-                  <tbody>
-                    {tracks.map((track, index) => (
-                      <tr key={track.id} onClick={() => openTrack(track.id)}>
-                        <td><span className="track-number">{String(index + 1).padStart(2, '0')}</span><strong>{track.title}</strong><small>{track.isrc}</small></td>
-                        <td>{track.artist.name}</td>
-                        <td>{track.genre}</td>
-                        <td>{formatDate(track.release_date)}</td>
-                        <td><StatusPill status={track.status} /></td>
-                        <td><button className="row-button" type="button" onClick={(event) => { event.stopPropagation(); openTrack(track.id) }} aria-label={`Open ${track.title}`}>↗</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Track</th><th>Artist</th><th>Genre</th><th>Release</th><th>Status</th><th><span className="sr-only">Open</span></th></tr></thead>
+                    <tbody>
+                      {tracks.map((track, index) => (
+                        <tr key={track.id} onClick={() => openTrack(track.id)}>
+                          <td><span className="track-number">{String((page - 1) * PAGE_SIZE + index + 1).padStart(2, '0')}</span><strong>{track.title}</strong><small>{track.isrc}</small></td>
+                          <td>{track.artist.name}</td>
+                          <td>{track.genre}</td>
+                          <td>{formatDate(track.release_date)}</td>
+                          <td><StatusPill status={track.status} /></td>
+                          <td><button className="row-button" type="button" onClick={(event) => { event.stopPropagation(); openTrack(track.id) }} aria-label={`Open ${track.title}`}>↗</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <nav className="pagination" aria-label="Track list pages">
+                  <p>Showing {firstResult}–{lastResult} of {totalCount}</p>
+                  <div>
+                    <button type="button" className="pagination__button" disabled={page === 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>← Previous</button>
+                    <span>Page {page} of {totalPages}</span>
+                    <button type="button" className="pagination__button" disabled={page === totalPages || loading} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next →</button>
+                  </div>
+                </nav>
+              </>
             )}
           </section>
         )}

@@ -17,13 +17,27 @@ export interface TrackFilters {
   genre?: string
 }
 
-export async function listTracks(statusOrFilters: TrackStatus | 'all' | TrackFilters = 'all'): Promise<Track[]> {
-  const filters = typeof statusOrFilters === 'string' ? { status: statusOrFilters } : statusOrFilters
-  if (!supabase) return demoTracks.filter((track) =>
+export interface TrackPage {
+  tracks: Track[]
+  count: number
+  page: number
+  pageSize: number
+}
+
+const normalizeFilters = (statusOrFilters: TrackStatus | 'all' | TrackFilters): TrackFilters =>
+  typeof statusOrFilters === 'string' ? { status: statusOrFilters } : statusOrFilters
+
+const filterDemoTracks = (filters: TrackFilters) => demoTracks
+  .filter((track) =>
     (!filters.status || filters.status === 'all' || track.status === filters.status) &&
     (!filters.artistId || track.artist_id === filters.artistId) &&
     (!filters.genre || track.genre === filters.genre),
   )
+  .sort((left, right) => right.release_date.localeCompare(left.release_date))
+
+export async function listTracks(statusOrFilters: TrackStatus | 'all' | TrackFilters = 'all'): Promise<Track[]> {
+  const filters = normalizeFilters(statusOrFilters)
+  if (!supabase) return filterDemoTracks(filters)
 
   let query = supabase.from('tracks').select(trackSelect).order('release_date', { ascending: false })
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
@@ -33,6 +47,46 @@ export async function listTracks(statusOrFilters: TrackStatus | 'all' | TrackFil
   const { data, error } = await query
   if (error) throw error
   return (data ?? []) as unknown as Track[]
+}
+
+export async function listTracksPage(
+  statusOrFilters: TrackStatus | 'all' | TrackFilters = 'all',
+  page = 1,
+  pageSize = 8,
+): Promise<TrackPage> {
+  const filters = normalizeFilters(statusOrFilters)
+  const safePage = Math.max(1, Math.trunc(page))
+  const safePageSize = Math.max(1, Math.min(50, Math.trunc(pageSize)))
+  const from = (safePage - 1) * safePageSize
+  const to = from + safePageSize - 1
+
+  if (!supabase) {
+    const matches = filterDemoTracks(filters)
+    return {
+      tracks: matches.slice(from, to + 1),
+      count: matches.length,
+      page: safePage,
+      pageSize: safePageSize,
+    }
+  }
+
+  let query = supabase
+    .from('tracks')
+    .select(trackSelect, { count: 'exact' })
+    .order('release_date', { ascending: false })
+    .range(from, to)
+  if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
+  if (filters.artistId) query = query.eq('artist_id', filters.artistId)
+  if (filters.genre) query = query.eq('genre', filters.genre)
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return {
+    tracks: (data ?? []) as unknown as Track[],
+    count: count ?? 0,
+    page: safePage,
+    pageSize: safePageSize,
+  }
 }
 
 export async function listArtists(): Promise<Artist[]> {
