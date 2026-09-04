@@ -66,12 +66,11 @@ For a linked hosted project:
 ```bash
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
-supabase db push
-supabase db execute --file supabase/seed.sql
+supabase db push --include-seed
 supabase functions deploy distribute-track
 ```
 
-Set the same hosted project URL and anon key in the front-end environment. Do not place `SUPABASE_SERVICE_ROLE_KEY` in a `VITE_` variable or any browser-accessible file. Supabase injects server secrets into the deployed Edge Function environment.
+Set the same hosted project URL and publishable key in the front-end environment. The existing `VITE_SUPABASE_ANON_KEY` variable name accepts the new `sb_publishable_...` key. Do not place a secret or service-role key in a `VITE_` variable or any browser-accessible file. Supabase injects server secrets into the deployed Edge Function environment.
 
 ## Authentication and protected operations
 
