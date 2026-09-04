@@ -26,6 +26,8 @@ Seeded tracks deliberately have no owner and are read-only. An evaluator signs i
 
 The first generated approach modeled “distribute track” as separate database writes after Edge Function validation. That was wrong because the second write could fail after distribution rows had already committed. I replaced both writes with one locked, transactional PostgreSQL function invoked only by the authenticated Edge Function. The React client still calls only `supabase.functions.invoke('distribute-track', ...)` for that workflow.
 
+It assumed that the logic doesn`t require a good styling since it says in PDF No design system required. Functional is enough.
+
 ## Additional engineering decisions
 
 - Native PostgreSQL enums plus `CHECK` constraints make invalid states fail close to the data.
