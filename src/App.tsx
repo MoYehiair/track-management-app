@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { distributeTrack, getTrack, listDsps, listTracks, updateTrackStatus } from './lib/tracks'
+import { createArtist, createTrack, distributeTrack, getTrack, listArtists, listDsps, listTracks, updateTrackStatus } from './lib/tracks'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
-import type { Dsp, Track, TrackStatus } from './types'
+import type { Artist, Dsp, Track, TrackStatus } from './types'
 
 const filters: Array<{ label: string; value: TrackStatus | 'all' }> = [
   { label: 'All tracks', value: 'all' },
@@ -26,6 +26,9 @@ function App() {
   const [error, setError] = useState('')
   const [session, setSession] = useState<Session | null>(null)
   const [showSignIn, setShowSignIn] = useState(false)
+  const [showNewArtist, setShowNewArtist] = useState(false)
+  const [showNewTrack, setShowNewTrack] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     supabase?.auth.getSession().then(({ data }) => setSession(data.session))
@@ -42,7 +45,7 @@ function App() {
       .catch((reason: Error) => active && setError(reason.message))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [status])
+  }, [status, reloadKey])
 
   async function openTrack(id: string) {
     setError('')
@@ -105,6 +108,9 @@ function App() {
                   {filter.label}
                 </button>
               ))}
+              <span className="filter-row__spacer" />
+              <button className="secondary-button" type="button" onClick={() => session ? setShowNewArtist(true) : setShowSignIn(true)}>+ Artist</button>
+              <button className="primary-button primary-button--compact" type="button" onClick={() => session ? setShowNewTrack(true) : setShowSignIn(true)}>+ Track</button>
             </div>
 
             {error && <div className="notice notice--error" role="alert">{error}</div>}
@@ -136,6 +142,8 @@ function App() {
       </main>
       <footer><span>RESONANT / TRACK OPERATIONS</span><span>SUPABASE + REACT</span></footer>
       {showSignIn && <SignInDialog onClose={() => setShowSignIn(false)} />}
+      {showNewArtist && <NewArtistDialog onClose={() => setShowNewArtist(false)} onComplete={() => { setShowNewArtist(false); setShowNewTrack(true) }} />}
+      {showNewTrack && <NewTrackDialog onClose={() => setShowNewTrack(false)} onComplete={(track) => { setShowNewTrack(false); setReloadKey((key) => key + 1); setSelected(track) }} />}
     </div>
   )
 }
@@ -284,6 +292,96 @@ function SignInDialog({ onClose }: { onClose: () => void }) {
           {error && <div className="notice notice--error" role="alert">{error}</div>}
           {message && <div className="notice notice--success" role="status">{message}</div>}
           <button className="primary-button primary-button--full" type="submit">Send sign-in link</button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function NewArtistDialog({ onClose, onComplete }: { onClose: () => void; onComplete: () => void }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [country, setCountry] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      await createArtist({ name: name.trim(), email: email.trim(), country: country.trim() })
+      onComplete()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not create artist.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="dialog dialog--small" role="dialog" aria-modal="true" aria-labelledby="new-artist-title">
+        <button className="dialog-close" type="button" onClick={onClose} aria-label="Close">×</button>
+        <p className="eyebrow">CATALOG ENTRY</p><h2 id="new-artist-title">Add an artist</h2>
+        <form onSubmit={submit}>
+          <label className="field"><span>Artist name</span><input required minLength={1} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label className="field"><span>Email</span><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+          <label className="field"><span>Country</span><input required minLength={2} maxLength={80} value={country} onChange={(event) => setCountry(event.target.value)} /></label>
+          {error && <div className="notice notice--error" role="alert">{error}</div>}
+          <div className="dialog-actions"><button className="text-button" type="button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save and add track'}</button></div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function NewTrackDialog({ onClose, onComplete }: { onClose: () => void; onComplete: (track: Track) => void }) {
+  const [artists, setArtists] = useState<Artist[]>([])
+  const [title, setTitle] = useState('')
+  const [artistId, setArtistId] = useState('')
+  const [isrc, setIsrc] = useState('')
+  const [releaseDate, setReleaseDate] = useState('')
+  const [genre, setGenre] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    listArtists()
+      .then((data) => { setArtists(data); if (data[0]) setArtistId(data[0].id) })
+      .catch((reason: Error) => setError(reason.message))
+  }, [])
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const track = await createTrack({
+        title: title.trim(), artist_id: artistId, isrc: isrc.trim().toUpperCase(),
+        release_date: releaseDate, genre: genre.trim(),
+      })
+      onComplete(track)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not create track.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="new-track-title">
+        <button className="dialog-close" type="button" onClick={onClose} aria-label="Close">×</button>
+        <p className="eyebrow">NEW RELEASE</p><h2 id="new-track-title">Add a track</h2>
+        <form className="form-grid" onSubmit={submit}>
+          <label className="field field--wide"><span>Title</span><input required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+          <label className="field field--wide"><span>Artist</span><select required value={artistId} onChange={(event) => setArtistId(event.target.value)}><option value="" disabled>Select an artist</option>{artists.map((artist) => <option key={artist.id} value={artist.id}>{artist.name}</option>)}</select></label>
+          <label className="field"><span>ISRC</span><input required pattern="[A-Za-z]{2}[A-Za-z0-9]{3}[0-9]{7}" maxLength={12} value={isrc} onChange={(event) => setIsrc(event.target.value)} placeholder="USRC12600001" /></label>
+          <label className="field"><span>Release date</span><input required type="date" value={releaseDate} onChange={(event) => setReleaseDate(event.target.value)} /></label>
+          <label className="field field--wide"><span>Genre</span><input required maxLength={80} value={genre} onChange={(event) => setGenre(event.target.value)} /></label>
+          {error && <div className="notice notice--error field--wide" role="alert">{error}</div>}
+          <div className="dialog-actions field--wide"><button className="text-button" type="button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit" disabled={saving || !artistId}>{saving ? 'Saving…' : 'Create track'}</button></div>
         </form>
       </div>
     </div>

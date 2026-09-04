@@ -87,6 +87,18 @@ export async function distributeTrack(trackId: string, dspIds: string[]) {
 
 export async function updateTrackStatus(trackId: string, status: TrackStatus): Promise<void> {
   if (!supabase) throw new Error('Connect Supabase to update a track status.')
-  const { error } = await supabase.from('tracks').update({ status }).eq('id', trackId)
-  if (error) throw error
+  const { data, error } = await supabase.rpc('update_track_status', {
+    p_track_id: trackId,
+    p_status: status,
+  })
+  if (error) {
+    const messages: Record<string, string> = {
+      TRACK_NOT_FOUND: 'Track not found.',
+      TRACK_NOT_OWNED: 'Only the person who created this track can update it.',
+      INVALID_STATUS_TRANSITION: 'Tracks can only move from draft to submitted, then to distributed.',
+      LIVE_DISTRIBUTION_REQUIRED: 'At least one DSP distribution must be live first.',
+    }
+    throw new Error(messages[error.message] ?? error.message)
+  }
+  if (!data?.length) throw new Error('The track status was not updated.')
 }

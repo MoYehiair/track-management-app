@@ -43,6 +43,7 @@ h2 { font-size: clamp(1.45rem, 2.6vw, 2.2rem); letter-spacing: -.035em; }
 .summary strong { display: block; color: var(--ink); font: 500 1.35rem 'DM Mono'; margin-bottom: 3px; }
 
 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.filter-row__spacer { flex: 1; }
 .filter { border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px; background: transparent; cursor: pointer; color: var(--muted); font-size: .88rem; }
 .filter:hover { border-color: var(--ink); color: var(--ink); }
 .filter--active { background: var(--ink); color: white; border-color: var(--ink); }
@@ -85,6 +86,8 @@ dd select { border: 1px solid var(--line); background: transparent; padding: 5px
 .card-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding-bottom: 28px; }
 .primary-button { border: 1px solid var(--ink); background: var(--acid); padding: 12px 17px; cursor: pointer; font-weight: 700; box-shadow: 3px 3px 0 var(--ink); transition: transform .14s, box-shadow .14s; }
 .primary-button:hover:not(:disabled) { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }.primary-button:disabled { opacity: .48; cursor: not-allowed; }.primary-button--full { width: 100%; margin-top: 20px; }
+.primary-button--compact { padding: 9px 15px; box-shadow: 2px 2px 0 var(--ink); }
+.secondary-button { border: 1px solid var(--ink); background: transparent; padding: 9px 15px; cursor: pointer; font-weight: 700; }
 .distribution-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
 .distribution-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
 .distribution-list li > span:nth-child(2) { display: grid; gap: 4px; }.distribution-list small { color: var(--muted); }
@@ -95,7 +98,8 @@ dd select { border: 1px solid var(--line); background: transparent; padding: 5px
 .dialog { position: relative; width: min(560px, 100%); background: var(--paper); border: 1px solid var(--ink); padding: clamp(28px, 5vw, 48px); box-shadow: 10px 10px 0 var(--acid); }.dialog--small { width: min(460px, 100%); }.dialog h2 { margin-bottom: 18px; }.dialog > p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }.dialog-close { position: absolute; right: 18px; top: 14px; border: 0; background: none; font-size: 1.8rem; cursor: pointer; }
 .dialog-actions { display: flex; justify-content: flex-end; align-items: center; gap: 22px; margin-top: 28px; }
 .dsp-options { display: grid; gap: 8px; margin: 24px 0; }.dsp-options label { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); padding: 14px; cursor: pointer; }.dsp-options label:has(input:checked) { border-color: var(--ink); background: #eef8b8; }.dsp-options input { width: 18px; height: 18px; accent-color: var(--ink); }
-.field { display: grid; gap: 8px; margin-top: 24px; font-size: .82rem; }.field input { width: 100%; border: 1px solid var(--ink); background: white; padding: 13px; font-size: 1rem; }
+.field { display: grid; gap: 8px; margin-top: 24px; font-size: .82rem; }.field input, .field select { width: 100%; border: 1px solid var(--ink); background: white; padding: 13px; font-size: 1rem; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }.field--wide { grid-column: 1 / -1; }
 
 footer { display: flex; justify-content: space-between; padding: 22px clamp(20px, 4vw, 64px); background: var(--ink); color: #f7f7ef; font: .64rem 'DM Mono'; letter-spacing: .11em; }
 
@@ -110,6 +114,7 @@ footer { display: flex; justify-content: space-between; padding: 22px clamp(20px
   h1 { font-size: 3.3rem; }.lede { line-height: 1.6; }.summary { width: 100%; justify-content: space-between; }
   .card-heading { display: block; }.card-heading .primary-button { margin-top: 24px; }
   .dialog-actions { align-items: stretch; flex-direction: column-reverse; }.dialog-actions button { width: 100%; }
+  .form-grid { grid-template-columns: 1fr; }.field--wide { grid-column: auto; }
   footer { display: grid; gap: 8px; }
 }
 
