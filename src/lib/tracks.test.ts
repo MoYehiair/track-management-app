@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('./supabase', () => ({ supabase: null }))
+
 import { getTrack, listTracks } from './tracks'
 
 describe('track data access demo fallback', () => {

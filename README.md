@@ -8,6 +8,7 @@ The UI works immediately with representative demo data when Supabase environment
 
 - Track list with artist, genre, release date, status, and status filtering
 - Track detail with full metadata and per-DSP distribution state
+- Authenticated create-artist and create-track forms
 - Passwordless Supabase Auth sign-in
 - Authenticated status updates protected by owner-scoped RLS
 - Authenticated `distribute-track` Edge Function with input, ownership, state, and DSP validation
@@ -21,7 +22,23 @@ The UI works immediately with representative demo data when Supabase environment
 - Docker Desktop (for local Supabase)
 - [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
 
-## Run locally
+## Run locally against hosted Supabase (no Docker)
+
+Create `.env.local` with the URL and publishable key from the project's **Connect** dialog:
+
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_your-key
+```
+
+In **Authentication → URL Configuration**, set the Site URL to `http://localhost:5173` and add `http://localhost:5173/**` to Redirect URLs. Then run:
+
+```bash
+npm install
+npm run dev
+```
+
+## Run the complete Supabase stack locally
 
 ```bash
 npm install
@@ -37,10 +54,10 @@ VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=your-local-anon-key
 ```
 
-Serve the Edge Function in a second terminal:
+Serve the Edge Function in a second terminal; Supabase provides its standard local secrets automatically:
 
 ```bash
-supabase functions serve distribute-track --env-file supabase/.env.local
+supabase functions serve distribute-track
 ```
 
 Then start the app:
@@ -67,6 +84,7 @@ For a linked hosted project:
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 supabase db push --include-seed
+supabase secrets set ALLOWED_ORIGINS=http://localhost:5173
 supabase functions deploy distribute-track
 ```
 
@@ -95,17 +113,19 @@ curl -i "$SUPABASE_URL/functions/v1/distribute-track" \
   -d '{"track_id":"30000000-0000-4000-8000-000000000002","dsp_ids":["20000000-0000-4000-8000-000000000001"]}'
 ```
 
-Seed tracks have `created_by = null` so any authenticated local evaluator can exercise the protected function. Tracks created through the client receive `auth.uid()` and can only be changed or distributed by their owner.
+Seed tracks are read-only examples because they have no owner. Sign in and use **+ Artist** and **+ Track** to create an owned release, then exercise protected status and distribution operations on that track.
 
 ## Security model
 
 - RLS is enabled on all four tables.
-- Catalog reads are public and operation-specific; artist/track writes require an authenticated owner.
+- Catalog reads are public and operation-specific, with public column grants excluding artist emails and owner UUIDs. Artist/track writes require an authenticated owner.
 - There are no client write policies for DSPs or distribution records.
 - The Edge Function verifies the JWT with `auth.getUser()` even though gateway JWT verification is also enabled.
 - The service-role key exists only inside the Edge Function environment.
 - Database constraints enforce required values, valid statuses, foreign keys, a unique ISRC, unique track/DSP pairs, and ISRC format.
 - A distributed track cannot be resubmitted; inactive or unknown DSPs and unowned tracks are rejected.
+- Distribution records and the track status update commit atomically in a locked PostgreSQL function.
+- Status changes use a protected RPC that enforces forward-only transitions and requires a live DSP before marking a track distributed.
 
 ## Client operations
 
@@ -136,7 +156,7 @@ DECISIONS.md                 AI-use and security review notes
 
 ## Submission checklist
 
-1. Push this repository to GitHub without squashing its existing logical commits.
+1. Project: [github.com/MoYehiair/track-management-app](https://github.com/MoYehiair/track-management-app)
 2. Create a Google Drive document named `FIRSTNAME_SECONDNAME_FULLSTACKDEVELOPER`.
 3. Add `01_Project link`, `02_How to run the project`, and `03_Vibe coding challenge` links.
 4. In the Supabase dashboard, invite `Mohamed.raafat@takwene.com` to the project with only the access level needed for review.
