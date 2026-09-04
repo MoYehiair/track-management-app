@@ -12,7 +12,6 @@ The UI works immediately with representative demo data when Supabase environment
 - Passwordless Supabase Auth sign-in
 - Authenticated status updates protected by owner-scoped RLS
 - Authenticated `distribute-track` Edge Function with input, ownership, state, and DSP validation
-- Bonus authenticated AI catalog assistant with Supabase-backed tools, unsupported-action refusal, and signed confirm-before-write flow
 - Versioned schema, explicit RLS policies, constraints, indexes, and realistic seed data
 - Typed client operations for artists, tracks, filters, detail, status updates, and distribution
 - Demo-fallback data and focused data-access tests
@@ -39,8 +38,6 @@ npm install
 npm run dev
 ```
 
-The catalog UI works once the two `VITE_` values are present. The bonus assistant also requires the deployed `catalog-chat` function and its server-side OpenAI secret; see **Bonus assistant setup** below.
-
 ## Run the complete Supabase stack locally
 
 ```bash
@@ -57,17 +54,10 @@ VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=your-local-anon-key
 ```
 
-Create `supabase/.env.local` for the bonus assistant (this file is ignored by Git):
-
-```dotenv
-OPENAI_API_KEY=your-openai-api-key
-OPENAI_MODEL=gpt-5.4-mini
-```
-
-Serve the Edge Functions in a second terminal; Supabase provides its standard local secrets automatically:
+Serve the Edge Function in a second terminal; Supabase provides its standard local secrets automatically:
 
 ```bash
-supabase functions serve --env-file supabase/.env.local
+supabase functions serve distribute-track
 ```
 
 Then start the app:
@@ -94,21 +84,11 @@ For a linked hosted project:
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 supabase db push --include-seed
-supabase secrets set ALLOWED_ORIGINS=http://localhost:5173 OPENAI_API_KEY=your-openai-api-key OPENAI_MODEL=gpt-5.4-mini
+supabase secrets set ALLOWED_ORIGINS=http://localhost:5173
 supabase functions deploy distribute-track
-supabase functions deploy catalog-chat
 ```
 
 Set the same hosted project URL and publishable key in the front-end environment. The existing `VITE_SUPABASE_ANON_KEY` variable name accepts the new `sb_publishable_...` key. Do not place a secret or service-role key in a `VITE_` variable or any browser-accessible file. Supabase injects server secrets into the deployed Edge Function environment.
-
-## Bonus assistant setup
-
-The React widget calls the authenticated `catalog-chat` Supabase Edge Function. The function calls the OpenAI Responses API with `gpt-5.4-mini` by default and exposes only these server-side tools:
-
-- `search_tracks`, `get_track`, `list_artists`, and `list_dsps` for read-only answers
-- `distribute_track` for the single supported write action
-
-For hosted use, set `OPENAI_API_KEY` only as a Supabase Edge Function secret. For a fully local Supabase stack, keep it in the ignored `supabase/.env.local` file shown above. Never add it to the front-end root `.env.local`, a `VITE_` variable, browser code, or Git. Users must sign in before chatting. A distribution request returns a signed confirmation token without changing data; the mutation runs only after the user presses **Confirm**. Requests for actions without a tool are refused rather than simulated.
 
 ## Authentication and protected operations
 
@@ -142,12 +122,10 @@ Seed tracks are read-only examples because they have no owner. Sign in and use *
 - There are no client write policies for DSPs or distribution records.
 - The Edge Function verifies the JWT with `auth.getUser()` even though gateway JWT verification is also enabled.
 - The service-role key exists only inside the Edge Function environment.
-- The OpenAI key exists only in Edge Function secrets; browser clients never receive it.
 - Database constraints enforce required values, valid statuses, foreign keys, a unique ISRC, unique track/DSP pairs, and ISRC format.
 - A distributed track cannot be resubmitted; inactive or unknown DSPs and unowned tracks are rejected.
 - Distribution records and the track status update commit atomically in a locked PostgreSQL function.
 - Status changes use a protected RPC that enforces forward-only transitions and requires a live DSP before marking a track distributed.
-- Chat writes use a ten-minute HMAC-signed confirmation bound to the authenticated user, followed by the same transactional distribution RPC.
 
 ## Client operations
 
@@ -159,8 +137,6 @@ Seed tracks are read-only examples because they have no owner. Sign in and use *
 - `updateTrackStatus`
 - `distributeTrack` through the Edge Function
 
-`src/lib/chat.ts` sends a bounded conversation to `catalog-chat`; database access remains in explicit server tools rather than in the prompt.
-
 ## Quality checks
 
 ```bash
@@ -171,9 +147,9 @@ npm run build
 ## Project structure
 
 ```text
-src/                         React UI, chat widget, and Supabase data layer
+src/                         React UI and Supabase data layer
 supabase/migrations/         Versioned PostgreSQL schema and RLS
-supabase/functions/          Authenticated distribution and AI chat Edge Functions
+supabase/functions/          Authenticated Deno Edge Function
 supabase/seed.sql            3 artists, 8 tracks, 3 DSPs, distributions
 DECISIONS.md                 AI-use and security review notes
 ```

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { ChatWidget } from './ChatWidget'
 import { createArtist, createTrack, distributeTrack, getTrack, listArtists, listDsps, listTracks, updateTrackStatus } from './lib/tracks'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Artist, Dsp, Track, TrackStatus } from './types'
@@ -145,14 +144,6 @@ function App() {
       {showSignIn && <SignInDialog onClose={() => setShowSignIn(false)} />}
       {showNewArtist && <NewArtistDialog onClose={() => setShowNewArtist(false)} onComplete={() => { setShowNewArtist(false); setShowNewTrack(true) }} />}
       {showNewTrack && <NewTrackDialog onClose={() => setShowNewTrack(false)} onComplete={(track) => { setShowNewTrack(false); setReloadKey((key) => key + 1); setSelected(track) }} />}
-      <ChatWidget
-        session={session}
-        onRequireSignIn={() => setShowSignIn(true)}
-        onCatalogChanged={() => {
-          setReloadKey((key) => key + 1)
-          if (selected) openTrack(selected.id)
-        }}
-      />
     </div>
   )
 }
