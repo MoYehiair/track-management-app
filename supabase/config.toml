@@ -1,0 +1,4 @@
+project_id = "track-management-app"
+
+[functions.distribute-track]
+verify_jwt = true
