@@ -4,7 +4,7 @@
 
 AI was used heavily to generate and revise the project structure, React interface, Supabase migrations, seed data, Edge Function, tests, and documentation. I configured the hosted Supabase project, linked it to the repository, applied the migrations and seed data, deployed the Edge Function, configured the local environment, authorized GitHub access, and reviewed the running result. I also directed a second correctness and security review and chose to address its findings before submission.
 
-The final implementation choices were deliberately constrained to the assignment. I kept the required two-view workflow, added create-artist and create-track forms so protected ownership flows can be tested, and retained a read-only demo fallback for easy review. I did not include the optional chatbot because a trustworthy tool-calling implementation would require an additional model provider, server-side secret management, and separate evaluation; it is explicitly a bonus rather than a core requirement.
+The final implementation choices were deliberately constrained to the assignment. I kept the required two-view workflow, added create-artist and create-track forms so protected ownership flows can be tested, and retained a read-only demo fallback for easy review. The optional chatbot is implemented as a separate authenticated Edge Function so the model provider key and all database tools remain server-side.
 
 ## 2. Security issues found and how they were handled
 
@@ -36,3 +36,19 @@ It assumed that the logic doesn`t require a good styling since it says in PDF No
 - Status changes go through a protected RPC that enforces ownership, forward-only transitions, and distribution invariants.
 - The UI remains usable without secrets by falling back to clearly marked demo data; protected writes fail with an explicit setup message.
 - The interface uses semantic tables, buttons, labels, focusable controls, responsive layouts, and reduced-motion handling without bringing in a design system.
+
+## Bonus chatbot and confirm-before-action flow
+
+The catalog assistant uses the OpenAI Responses API with a small allowlist of Supabase-backed tools. It can search tracks, list artists and DSPs, fetch track details, and request distribution. The model never receives database credentials and cannot issue raw SQL. Unsupported mutations—such as deleting a track or changing artist metadata—have no tool, so the assistant must say it cannot perform them.
+
+Example transcript:
+
+> **User:** Distribute “Midnight Signal” to Spotify and Apple Music.
+>
+> **Assistant:** Submit “Midnight Signal” to Apple Music, Spotify and set its status to submitted. Should I go ahead?
+>
+> **User:** Yes, go ahead.
+>
+> **Assistant:** Done — “Midnight Signal” was submitted to Apple Music, Spotify. Its workflow status is now submitted.
+
+To prevent destructive actions by mistake, the server intercepts every write tool call and performs no mutation until the user presses **Confirm**; the confirmation is a signed, user-bound token that expires after ten minutes, and the server rechecks authentication, ownership, track state, and DSP validity before the transactional RPC runs. There are no delete tools.
